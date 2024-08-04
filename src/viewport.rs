@@ -7,7 +7,6 @@ use crossterm::*;
 pub struct Cell {
     symbol: char,
     fg: Color,
-    bg: Color,
 }
 
 impl Default for Cell {
@@ -15,7 +14,6 @@ impl Default for Cell {
         Cell {
             symbol: ' ',
             fg: Color::Reset,
-            bg: Color::Reset,
         }
     }
 }
@@ -35,19 +33,16 @@ impl Viewport {
         }
     }
 
-    pub fn set_cell(&mut self, col: usize, row: usize, symbol: char) {
+    pub fn set_cell(&mut self, col: usize, row: usize, symbol: char, color: Color) {
         let pos = row * self.size.0 + col;
-        self.buffer[pos] = Cell {
-            symbol,
-            fg: Color::Reset,
-            bg: Color::Reset,
-        }
+        self.buffer[pos] = Cell { symbol, fg: color }
     }
 
-    pub fn fill<T, U>(&mut self, mut code: T)
+    pub fn fill<T, U, S>(&mut self, mut code: T, style_extractor: S)
     where
         T: Iterator<Item = U>,
         U: AsRef<str>,
+        S: Fn(usize, usize) -> Color,
     {
         for row in 0..self.size.1 {
             let line = code.next();
@@ -60,7 +55,8 @@ impl Viewport {
                     s if s.is_whitespace() => ' ',
                     s => s,
                 };
-                self.set_cell(col, row, symbol);
+                let style = style_extractor(col, row);
+                self.set_cell(col, row, symbol, style);
             }
         }
     }
@@ -72,6 +68,7 @@ impl Viewport {
             crossterm::queue!(
                 stdout(),
                 crossterm::cursor::MoveTo(col as u16, row as u16),
+                crossterm::style::SetForegroundColor(cell.fg),
                 crossterm::style::Print(cell.symbol)
             )
             .expect("Failed to queue events to stdout");
